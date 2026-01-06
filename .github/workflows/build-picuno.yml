@@ -14,11 +14,20 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+        df -h
+    
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 0
+        fetch-depth: 1
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -28,9 +37,10 @@ jobs:
     - name: Install ARM GCC
       run: |
         sudo apt-get update
-        wget https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz
+        wget -q https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz
         sudo tar xf arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz -C /opt/
         echo "/opt/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi/bin" >> $GITHUB_PATH
+        rm arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz
     
     - name: Install Python dependencies
       run: |
@@ -43,7 +53,7 @@ jobs:
     - name: Build PicUNO RP2040 firmware
       run: |
         cd ports/raspberrypi
-        make BOARD=picuno_rp2040
+        make BOARD=picuno_rp2040 -j2
     
     - name: Get version info
       id: version
