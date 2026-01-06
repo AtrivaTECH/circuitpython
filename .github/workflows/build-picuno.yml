@@ -2,12 +2,11 @@ name: Build PicUNO RP2040 Firmware
 
 on:
   push:
-    branches: [ picuno-support, main ]
-  pull_request:
-    branches: [ picuno-support, main ]
+    branches: [ picuno-support ]
+    paths:
+      - 'ports/raspberrypi/boards/picuno_rp2040/**'
+      - '.github/workflows/build-picuno.yml'
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * 0'
 
 jobs:
   build-circuitpython:
@@ -19,15 +18,20 @@ jobs:
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /opt/ghc
-        sudo rm -rf /opt/hostedtoolcache/CodeQL
-        sudo docker image prune --all --force
         df -h
     
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 1
+        fetch-depth: 0
+        fetch-tags: true
+    
+    - name: Fetch tags from upstream
+      run: |
+        git remote add upstream https://github.com/adafruit/circuitpython.git || true
+        git fetch upstream --tags
+        git describe --tags
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -54,25 +58,11 @@ jobs:
       run: |
         cd ports/raspberrypi
         make BOARD=picuno_rp2040 -j2
-    
-    - name: Get version info
-      id: version
-      run: |
-        echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-        echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+        ls -lh build-picuno_rp2040/
     
     - name: Upload firmware
       uses: actions/upload-artifact@v4
       with:
-        name: circuitpython-picuno_rp2040-${{ steps.version.outputs.date }}-${{ steps.version.outputs.sha_short }}
+        name: circuitpython-picuno-rp2040
         path: ports/raspberrypi/build-picuno_rp2040/firmware.uf2
-        retention-days: 90
-    
-    - name: Create Release (on tag)
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: ports/raspberrypi/build-picuno_rp2040/firmware.uf2
-        name: CircuitPython for PicUNO RP2040 ${{ github.ref_name }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if-no-files-found: error
