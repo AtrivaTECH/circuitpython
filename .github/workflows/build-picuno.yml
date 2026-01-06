@@ -1,4 +1,4 @@
-name: Build PicUNO RP2040 Firmware
+name: Build PicUNO RP2040 ONLY
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-circuitpython:
+  build-picuno-only:
     runs-on: ubuntu-latest
     
     steps:
@@ -18,6 +18,7 @@ jobs:
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /opt/ghc
+        sudo docker image prune --all --force
         df -h
     
     - name: Checkout repository
@@ -30,8 +31,8 @@ jobs:
     - name: Fetch tags from upstream
       run: |
         git remote add upstream https://github.com/adafruit/circuitpython.git || true
-        git fetch upstream --tags
-        git describe --tags
+        git fetch --tags upstream
+        git describe --tags || echo "9.2.0"
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -54,13 +55,14 @@ jobs:
     - name: Build mpy-cross
       run: make -C mpy-cross
     
-    - name: Build PicUNO RP2040 firmware
+    - name: Build ONLY PicUNO RP2040
       run: |
         cd ports/raspberrypi
+        echo "Building ONLY picuno_rp2040 board..."
         make BOARD=picuno_rp2040 -j2
-        ls -lh build-picuno_rp2040/
+        ls -lh build-picuno_rp2040/firmware.uf2
     
-    - name: Upload firmware
+    - name: Upload PicUNO firmware
       uses: actions/upload-artifact@v4
       with:
         name: circuitpython-picuno-rp2040
