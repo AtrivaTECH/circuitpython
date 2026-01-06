@@ -1,0 +1,68 @@
+name: Build PicUNO RP2040 Firmware
+
+on:
+  push:
+    branches: [ picuno-support, main ]
+  pull_request:
+    branches: [ picuno-support, main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  build-circuitpython:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install ARM GCC
+      run: |
+        sudo apt-get update
+        wget https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz
+        sudo tar xf arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz -C /opt/
+        echo "/opt/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi/bin" >> $GITHUB_PATH
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+    
+    - name: Build mpy-cross
+      run: make -C mpy-cross
+    
+    - name: Build PicUNO RP2040 firmware
+      run: |
+        cd ports/raspberrypi
+        make BOARD=picuno_rp2040
+    
+    - name: Get version info
+      id: version
+      run: |
+        echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+    
+    - name: Upload firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: circuitpython-picuno_rp2040-${{ steps.version.outputs.date }}-${{ steps.version.outputs.sha_short }}
+        path: ports/raspberrypi/build-picuno_rp2040/firmware.uf2
+        retention-days: 90
+    
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ports/raspberrypi/build-picuno_rp2040/firmware.uf2
+        name: CircuitPython for PicUNO RP2040 ${{ github.ref_name }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
